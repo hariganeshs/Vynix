@@ -7,6 +7,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import Conversation from './pages/Conversation';
+import SharedConversation from './pages/SharedConversation';
 import LoadingSpinner from './components/LoadingSpinner';
 
 function AppContent() {
@@ -31,6 +32,10 @@ function AppContent() {
         <Route 
           path="/register" 
           element={user ? <Navigate to="/dashboard" replace /> : <Register />} 
+        />
+        <Route 
+          path="/share/:token" 
+          element={<SharedConversation />} 
         />
         
         {/* Protected routes */}

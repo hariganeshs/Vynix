@@ -315,7 +315,7 @@ const ExpandedNodeView = ({ node, onClose, onBranch, onDelete, onTitleEdit }) =>
 };
 
 // Custom Node Component
-const ConversationNodeBase = ({ data, selected }) => {
+const ConversationNodeBase = ({ data, selected, readOnly = false }) => {
   const layout = data.layout || 'horizontal';
   const [isExpanded, setIsExpanded] = useState(false);
   const [showBranchButton, setShowBranchButton] = useState(false);
@@ -334,6 +334,8 @@ const ConversationNodeBase = ({ data, selected }) => {
   }, [selected, isExpanded]);
 
   const handleTextSelection = useCallback(() => {
+    if (readOnly) return;
+    
     const selection = window.getSelection();
     const selectedText = selection.toString().trim();
     if (selectedText && selectedText.length > 0) {
@@ -349,7 +351,7 @@ const ConversationNodeBase = ({ data, selected }) => {
       setShowBranchButton(false);
       setBranchText('');
     }
-  }, []);
+  }, [readOnly]);
 
   const handleBranchClick = useCallback((e) => {
     e.stopPropagation();
@@ -600,7 +602,7 @@ const ConversationNodeBase = ({ data, selected }) => {
 
 
           <AnimatePresence>
-            {showBranchButton && (
+            {showBranchButton && !readOnly && (
               <motion.div
                 initial={{ opacity: 0, y: 5 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -676,7 +678,8 @@ const ConversationTree = ({
   layout = 'horizontal',
   focusNodeId = null,
   isSending = false,
-  pendingParentId = null
+  pendingParentId = null,
+  readOnly = false
 }) => {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
@@ -1034,8 +1037,8 @@ const ConversationTree = ({
   );
 
   const nodeTypes = useMemo(() => ({
-    conversationNode: ConversationNode
-  }), []);
+    conversationNode: (props) => <ConversationNode {...props} readOnly={readOnly} />
+  }), [readOnly]);
 
   return (
     <div className="w-full h-full" style={{ pointerEvents: 'all' }}>

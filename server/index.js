@@ -8,6 +8,7 @@ require('dotenv').config();
 const authRoutes = require('./routes/auth');
 const conversationRoutes = require('./routes/conversations');
 const aiRoutes = require('./routes/ai');
+const { contentSafetyMiddleware } = require('./middleware/contentSafety');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -40,7 +41,7 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/vynix')
 
 // Routes
 app.use('/api/auth', authRoutes);
-app.use('/api/conversations', conversationRoutes);
+app.use('/api/conversations', contentSafetyMiddleware, conversationRoutes);
 app.use('/api/ai', aiRoutes);
 
 // Health check endpoint

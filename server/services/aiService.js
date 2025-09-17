@@ -1,5 +1,6 @@
 const axios = require('axios');
 const { v4: uuidv4 } = require('uuid');
+const cacheService = require('./cache');
 
 class AIService {
   constructor() {
@@ -52,6 +53,27 @@ class AIService {
     const startTime = Date.now();
     
     try {
+      // Check FREE_MODE restrictions
+      if (process.env.FREE_MODE === 'true' && !['lmstudio', 'openrouter'].includes(provider)) {
+        throw new Error(`Provider ${provider} is not available in FREE_MODE. Only LM Studio and OpenRouter free models are allowed.`);
+      }
+      
+      // For OpenRouter in FREE_MODE, ensure only free models are used
+      if (process.env.FREE_MODE === 'true' && provider === 'openrouter' && model && !model.includes(':free')) {
+        throw new Error(`Model ${model} is not free. Only models ending with ':free' are allowed in FREE_MODE.`);
+      }
+      
+      // Check cache first
+      const cachedResponse = cacheService.get(provider, model, prompt, context);
+      if (cachedResponse) {
+        console.log('Returning cached response');
+        return {
+          ...cachedResponse,
+          responseTime: Date.now() - startTime,
+          cached: true
+        };
+      }
+      
       const providerConfig = this.providers[provider];
       if (!providerConfig) {
         throw new Error(`Unsupported provider: ${provider}`);
@@ -74,14 +96,20 @@ class AIService {
 
       const responseTime = Date.now() - startTime;
       
-      return {
+      const result = {
         id: uuidv4(),
         content: response.content,
         tokens: response.tokens || 0,
         responseTime,
         provider,
-        model: response.model || model || 'default'
+        model: response.model || model || 'default',
+        cached: false
       };
+
+      // Cache the successful response
+      cacheService.set(provider, model, prompt, context, result);
+      
+      return result;
 
     } catch (error) {
       console.error(`AI Service Error (${provider}):`, error.message);
@@ -243,7 +271,14 @@ class AIService {
   }
 
   getAvailableProviders() {
-    return Object.keys(this.providers);
+    const allProviders = Object.keys(this.providers);
+    
+    // If FREE_MODE is enabled, only return free providers
+    if (process.env.FREE_MODE === 'true') {
+      return allProviders.filter(provider => ['lmstudio', 'openrouter'].includes(provider));
+    }
+    
+    return allProviders;
   }
 
   getProviderConfig(provider) {
@@ -251,35 +286,44 @@ class AIService {
   }
 
   getModels(provider) {
-    switch (provider) {
-      case 'google':
-        return [
-          'gemini-1.5-flash',      // Cheapest, fastest
-          'gemini-1.5-flash-exp',  // Experimental version
-          'gemini-2.0-flash',      // Newer, still cost-effective
-          'gemini-1.5-pro',        // More capable, higher cost
-          'gemini-1.0-pro',        // Legacy
-          'gemini-pro'             // Original
-        ];
-      case 'openai':
-        return ['gpt-4o', 'gpt-4o-mini', 'gpt-3.5-turbo'];
-      case 'groq':
-        return ['llama-3.1-70b-versatile', 'llama-3.1-8b-instant'];
-      case 'lmstudio':
-        // LM Studio model ids vary by what's loaded
-        return ['openai/gpt-oss-20b'];
-      case 'openrouter':
-        return [
-          'openai/gpt-oss-20b:free',
-          'z-ai/glm-4.5-air:free',
-          'qwen/qwen3-coder:free',
-          'moonshotai/kimi-k2:free',
-          'cognitivecomputations/dolphin-mistral-24b-venice-edition:free',
-          'google/gemma-3n-e2b-it:free'
-        ];
-      default:
-        return [];
+    const allModels = {
+      google: [
+        'gemini-1.5-flash',      // Cheapest, fastest
+        'gemini-1.5-flash-exp',  // Experimental version
+        'gemini-2.0-flash',      // Newer, still cost-effective
+        'gemini-1.5-pro',        // More capable, higher cost
+        'gemini-1.0-pro',        // Legacy
+        'gemini-pro'             // Original
+      ],
+      openai: ['gpt-4o', 'gpt-4o-mini', 'gpt-3.5-turbo'],
+      groq: ['llama-3.1-70b-versatile', 'llama-3.1-8b-instant'],
+      lmstudio: ['openai/gpt-oss-20b'],
+      openrouter: [
+        'openai/gpt-oss-20b:free',
+        'z-ai/glm-4.5-air:free',
+        'qwen/qwen3-coder:free',
+        'moonshotai/kimi-k2:free',
+        'cognitivecomputations/dolphin-mistral-24b-venice-edition:free',
+        'google/gemma-3n-e2b-it:free'
+      ]
+    };
+
+    const models = allModels[provider] || [];
+    
+    // If FREE_MODE is enabled, filter to only free models
+    if (process.env.FREE_MODE === 'true') {
+      if (provider === 'openrouter') {
+        return models.filter(model => model.includes(':free'));
+      }
+      // For lmstudio, return all models as they're local/free
+      if (provider === 'lmstudio') {
+        return models;
+      }
+      // For other providers in FREE_MODE, return empty array
+      return [];
     }
+    
+    return models;
   }
 }
 

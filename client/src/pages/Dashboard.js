@@ -8,12 +8,14 @@ import {
   Trash2, 
   Search,
   Grid,
-  List
+  List,
+  Upload
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../hooks/useAuth';
 import api from '../services/api';
 import LoadingSpinner from '../components/LoadingSpinner';
+import AdSlot from '../components/AdSlot';
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -54,6 +56,39 @@ const Dashboard = () => {
     } catch (error) {
       console.error('Failed to delete conversation:', error);
       toast.error('Failed to delete conversation');
+    }
+  };
+
+  const handleImport = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    if (!file.name.endsWith('.json')) {
+      toast.error('Please select a valid JSON file');
+      return;
+    }
+
+    try {
+      const text = await file.text();
+      const importData = JSON.parse(text);
+      
+      if (!importData.conversation) {
+        toast.error('Invalid conversation file format');
+        return;
+      }
+
+      const response = await api.post('/conversations/import', {
+        conversation: importData.conversation
+      });
+
+      setConversations(prev => [response.data.conversation, ...prev]);
+      toast.success('Conversation imported successfully!');
+      
+      // Navigate to the imported conversation
+      navigate(`/conversation/${response.data.conversation._id}`);
+    } catch (error) {
+      console.error('Import failed:', error);
+      toast.error('Failed to import conversation');
     }
   };
 
@@ -156,6 +191,18 @@ const Dashboard = () => {
           </button>
         </div>
 
+        {/* Import Conversation */}
+        <label className="btn btn-secondary px-6 py-2 cursor-pointer">
+          <Upload className="w-4 h-4 mr-2" />
+          Import
+          <input
+            type="file"
+            accept=".json"
+            onChange={handleImport}
+            className="hidden"
+          />
+        </label>
+
         {/* New Conversation */}
         <button
           onClick={() => navigate('/conversation/new')}
@@ -200,16 +247,16 @@ const Dashboard = () => {
             className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' : 'space-y-4'}
           >
             {filteredConversations.map((conversation, index) => (
-              <motion.div
-                key={conversation._id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.1 }}
-                className={`bg-white/80 dark:bg-secondary-900/80 backdrop-blur-sm rounded-lg border border-secondary-200 dark:border-secondary-700 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer ${
-                  viewMode === 'list' ? 'flex items-center p-4' : 'p-6'
-                }`}
-                onClick={() => navigate(`/conversation/${conversation._id}`)}
-              >
+              <React.Fragment key={conversation._id}>
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.1 }}
+                  className={`bg-white/80 dark:bg-secondary-900/80 backdrop-blur-sm rounded-lg border border-secondary-200 dark:border-secondary-700 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer ${
+                    viewMode === 'list' ? 'flex items-center p-4' : 'p-6'
+                  }`}
+                  onClick={() => navigate(`/conversation/${conversation._id}`)}
+                >
                 {viewMode === 'list' ? (
                   <>
                     <div className="flex-1">
@@ -271,7 +318,18 @@ const Dashboard = () => {
                     </div>
                   </>
                 )}
-              </motion.div>
+                </motion.div>
+                
+                {/* Ad Slot - Between conversations (every 3rd item) */}
+                {viewMode === 'grid' && (index + 1) % 3 === 0 && (
+                  <div className="col-span-full flex justify-center my-4">
+                    <AdSlot 
+                      slot={`dashboard-${Math.floor(index / 3)}`} 
+                      size="banner" 
+                    />
+                  </div>
+                )}
+              </React.Fragment>
             ))}
           </motion.div>
         )}

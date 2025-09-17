@@ -18,6 +18,8 @@ import { ReactFlowProvider } from 'reactflow';
 import toast from 'react-hot-toast';
 import ConversationTree from '../components/ConversationTree';
 import LoadingSpinner from '../components/LoadingSpinner';
+import AdSlot from '../components/AdSlot';
+import LMStudioGuide from '../components/LMStudioGuide';
 // import { useAuth } from '../hooks/useAuth';
 import { cn } from '../utils/cn';
 import api from '../services/api';
@@ -32,8 +34,12 @@ const Conversation = () => {
   const [sending, setSending] = useState(false);
   const [pendingParentId, setPendingParentId] = useState(null);
   const [prompt, setPrompt] = useState('');
-  const [selectedProvider, setSelectedProvider] = useState('google');
-  const [selectedModel, setSelectedModel] = useState('gemini-1.5-flash');
+  const [selectedProvider, setSelectedProvider] = useState(
+    process.env.REACT_APP_FREE_MODE === 'true' ? 'openrouter' : 'google'
+  );
+  const [selectedModel, setSelectedModel] = useState(
+    process.env.REACT_APP_FREE_MODE === 'true' ? 'openai/gpt-oss-20b:free' : 'gemini-1.5-flash'
+  );
   const [showSettings, setShowSettings] = useState(false);
   const [selectedNodes, setSelectedNodes] = useState([]);
   const [treeLayout, setTreeLayout] = useState('vertical'); // 'horizontal' or 'vertical'
@@ -246,8 +252,80 @@ const Conversation = () => {
     }
   }, []);
 
+  // Handle export conversation
+  const handleExport = useCallback(async () => {
+    if (!conversation) {
+      toast.error('No conversation to export');
+      return;
+    }
+
+    try {
+      const response = await api.get(`/conversations/${id}/export`, {
+        responseType: 'blob'
+      });
+
+      // Create blob and download
+      const blob = new Blob([JSON.stringify(response.data, null, 2)], { 
+        type: 'application/json' 
+      });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `conversation-${conversation.title.replace(/[^a-zA-Z0-9]/g, '_')}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      toast.success('Conversation exported successfully!');
+    } catch (error) {
+      console.error('Export failed:', error);
+      toast.error('Failed to export conversation');
+    }
+  }, [conversation, id]);
+
+  // Handle share conversation
+  const handleShare = useCallback(async () => {
+    if (!conversation) {
+      toast.error('No conversation to share');
+      return;
+    }
+
+    try {
+      if (conversation.isPublic && conversation.shareToken) {
+        // Revoke share
+        await api.delete(`/conversations/${id}/share`);
+        toast.success('Conversation is no longer public');
+        // Update conversation state
+        setConversation(prev => ({
+          ...prev,
+          isPublic: false,
+          shareToken: null
+        }));
+      } else {
+        // Create share
+        const response = await api.post(`/conversations/${id}/share`);
+        const { shareUrl } = response.data;
+        
+        // Copy to clipboard
+        await navigator.clipboard.writeText(shareUrl);
+        toast.success('Share link copied to clipboard!');
+        
+        // Update conversation state
+        setConversation(prev => ({
+          ...prev,
+          isPublic: true,
+          shareToken: response.data.shareToken
+        }));
+      }
+    } catch (error) {
+      console.error('Share failed:', error);
+      toast.error('Failed to share conversation');
+    }
+  }, [conversation, id]);
+
   // API Providers configuration
-  const apiProviders = [
+  const allApiProviders = [
     { id: 'lmstudio', name: 'LM Studio', icon: Brain, description: 'Local AI (127.0.0.1:1234)' },
     { id: 'openai', name: 'OpenAI', icon: Zap, description: 'GPT-3.5/4 Models' },
     { id: 'google', name: 'Google AI', icon: Globe, description: 'Gemini Models' },
@@ -255,7 +333,12 @@ const Conversation = () => {
     { id: 'openrouter', name: 'OpenRouter', icon: MessageSquare, description: 'Free AI Models' }
   ];
 
-  const models = {
+  // Filter providers based on FREE_MODE
+  const apiProviders = process.env.REACT_APP_FREE_MODE === 'true' 
+    ? allApiProviders.filter(p => ['lmstudio', 'openrouter'].includes(p.id))
+    : allApiProviders;
+
+  const allModels = {
     lmstudio: ['gpt-3.5-turbo', 'gpt-4', 'llama-2-7b', 'llama-2-13b', 'openai/gpt-oss-20b'],
     openai: ['gpt-3.5-turbo', 'gpt-4', 'gpt-4-turbo'],
     google: [
@@ -277,6 +360,14 @@ const Conversation = () => {
       'google/gemma-3n-e2b-it:free'
     ]
   };
+
+  // Filter models based on FREE_MODE
+  const models = process.env.REACT_APP_FREE_MODE === 'true' 
+    ? {
+        lmstudio: allModels.lmstudio,
+        openrouter: allModels.openrouter.filter(model => model.includes(':free'))
+      }
+    : allModels;
 
   // Set default models based on provider
   React.useEffect(() => {
@@ -330,12 +421,18 @@ const Conversation = () => {
             <Settings className="w-5 h-5" />
           </button>
           <button
-            className="p-2 text-secondary-600 hover:text-secondary-900 dark:text-secondary-400 dark:hover:text-secondary-100 transition-colors"
-            title="Share"
+            onClick={handleShare}
+            className={`p-2 transition-colors ${
+              conversation?.isPublic 
+                ? 'text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300' 
+                : 'text-secondary-600 hover:text-secondary-900 dark:text-secondary-400 dark:hover:text-secondary-100'
+            }`}
+            title={conversation?.isPublic ? 'Revoke share' : 'Share conversation'}
           >
             <Share2 className="w-5 h-5" />
           </button>
           <button
+            onClick={handleExport}
             className="p-2 text-secondary-600 hover:text-secondary-900 dark:text-secondary-400 dark:hover:text-secondary-100 transition-colors"
             title="Export"
           >
@@ -468,6 +565,20 @@ const Conversation = () => {
                   </div>
                 </div>
 
+                {/* LM Studio Guide */}
+                {selectedProvider === 'lmstudio' && (
+                  <div className="mb-6">
+                    <LMStudioGuide />
+                  </div>
+                )}
+
+                {/* Ad Slot - Sidebar Top */}
+                <AdSlot 
+                  slot="sidebar-top" 
+                  size="rectangle" 
+                  className="mb-6"
+                />
+
                 {/* Conversation Info */}
                 {conversation && (
                   <div>
@@ -494,6 +605,13 @@ const Conversation = () => {
                     </div>
                   </div>
                 )}
+
+                {/* Ad Slot - Sidebar Bottom */}
+                <AdSlot 
+                  slot="sidebar-bottom" 
+                  size="rectangle" 
+                  className="mt-6"
+                />
               </div>
             </motion.aside>
           )}
@@ -520,14 +638,21 @@ const Conversation = () => {
               </ReactFlowProvider>
             ) : (
               <div className="flex items-center justify-center h-full">
-                <div className="text-center">
+                <div className="text-center max-w-md">
                   <MessageSquare className="w-16 h-16 text-secondary-400 mx-auto mb-4" />
                   <h3 className="text-lg font-medium text-secondary-900 dark:text-secondary-100 mb-2">
                     Start Your Conversation
                   </h3>
-                  <p className="text-secondary-500 dark:text-secondary-400">
+                  <p className="text-secondary-500 dark:text-secondary-400 mb-4">
                     Enter a prompt below to begin your AI-powered conversation
                   </p>
+                  
+                  {/* Show LM Studio guide for free mode */}
+                  {process.env.REACT_APP_FREE_MODE === 'true' && selectedProvider === 'lmstudio' && (
+                    <div className="mt-6">
+                      <LMStudioGuide />
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -588,6 +713,15 @@ const Conversation = () => {
                 Select a node in the tree to create a branch from it, or select text in a node to branch from that specific content
               </p>
             )}
+          </div>
+
+          {/* Ad Slot - Below Input */}
+          <div className="mt-4">
+            <AdSlot 
+              slot="below-input" 
+              size="responsive" 
+              className="mx-auto"
+            />
           </div>
         </div>
       </div>

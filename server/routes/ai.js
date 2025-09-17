@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const aiService = require('../services/aiService');
+const cacheService = require('../services/cache');
 const auth = require('../middleware/auth');
 
 // Test AI provider connection
@@ -83,6 +84,28 @@ router.get('/providers/:provider', auth, (req, res) => {
   } catch (error) {
     console.error('Get provider config error:', error);
     res.status(500).json({ error: 'Failed to get provider configuration' });
+  }
+});
+
+// Get cache statistics
+router.get('/cache/stats', auth, (req, res) => {
+  try {
+    const stats = cacheService.getStats();
+    res.json({ stats });
+  } catch (error) {
+    console.error('Get cache stats error:', error);
+    res.status(500).json({ error: 'Failed to get cache statistics' });
+  }
+});
+
+// Clear cache
+router.post('/cache/clear', auth, (req, res) => {
+  try {
+    cacheService.clear();
+    res.json({ success: true, message: 'Cache cleared successfully' });
+  } catch (error) {
+    console.error('Clear cache error:', error);
+    res.status(500).json({ error: 'Failed to clear cache' });
   }
 });
 

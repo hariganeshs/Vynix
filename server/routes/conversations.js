@@ -428,17 +428,163 @@ router.get('/shared/:token', async (req, res) => {
       return res.status(404).json({ error: 'Shared conversation not found' });
     }
 
+    // Apply content safety filtering for public viewing
+    const sanitizedConversation = req.contentSafety.sanitizeConversation(conversation.toObject());
     const treeStructure = conversation.getTreeStructure();
     
     res.json({
       conversation: {
-        ...conversation.toObject(),
+        ...sanitizedConversation,
         treeStructure
       }
     });
   } catch (error) {
     console.error('Get shared conversation error:', error);
     res.status(500).json({ error: 'Failed to get shared conversation' });
+  }
+});
+
+// Export conversation
+router.get('/:id/export', auth, async (req, res) => {
+  try {
+    const conversation = await Conversation.findOne({
+      _id: req.params.id,
+      userId: req.user.id
+    });
+
+    if (!conversation) {
+      return res.status(404).json({ error: 'Conversation not found' });
+    }
+
+    // Create export data
+    const exportData = {
+      version: '1.0',
+      exportedAt: new Date().toISOString(),
+      conversation: {
+        title: conversation.title,
+        description: conversation.description,
+        nodes: conversation.nodes,
+        rootNodeId: conversation.rootNodeId,
+        createdAt: conversation.createdAt,
+        lastModified: conversation.lastModified,
+        settings: conversation.settings
+      }
+    };
+
+    // Set headers for file download
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', `attachment; filename="conversation-${conversation.title.replace(/[^a-zA-Z0-9]/g, '_')}.json"`);
+    
+    res.json(exportData);
+  } catch (error) {
+    console.error('Export conversation error:', error);
+    res.status(500).json({ error: 'Failed to export conversation' });
+  }
+});
+
+// Import conversation
+router.post('/import', auth, async (req, res) => {
+  try {
+    const { conversation: importData } = req.body;
+    
+    if (!importData || !importData.title || !importData.nodes) {
+      return res.status(400).json({ error: 'Invalid conversation data' });
+    }
+
+    // Validate the imported data structure
+    if (!Array.isArray(importData.nodes) || importData.nodes.length === 0) {
+      return res.status(400).json({ error: 'Invalid nodes data' });
+    }
+
+    // Create new conversation from imported data
+    const newConversation = new Conversation({
+      title: importData.title,
+      description: importData.description || '',
+      userId: req.user.id,
+      rootNodeId: importData.rootNodeId || importData.nodes[0]?.id,
+      nodes: importData.nodes,
+      settings: importData.settings || {}
+    });
+
+    await newConversation.save();
+    
+    res.status(201).json({
+      success: true,
+      conversation: {
+        ...newConversation.toObject(),
+        treeStructure: newConversation.getTreeStructure()
+      }
+    });
+  } catch (error) {
+    console.error('Import conversation error:', error);
+    res.status(500).json({ 
+      error: 'Failed to import conversation',
+      message: error.message 
+    });
+  }
+});
+
+// Share conversation (create share token)
+router.post('/:id/share', auth, async (req, res) => {
+  try {
+    const conversation = await Conversation.findOne({
+      _id: req.params.id,
+      userId: req.user.id
+    });
+
+    if (!conversation) {
+      return res.status(404).json({ error: 'Conversation not found' });
+    }
+
+    // Generate share token if not exists
+    if (!conversation.shareToken) {
+      conversation.shareToken = uuidv4();
+    }
+    
+    conversation.isPublic = true;
+    conversation.lastModified = new Date();
+
+    await conversation.save();
+
+    const shareUrl = `${process.env.CLIENT_URL || 'http://localhost:3000'}/share/${conversation.shareToken}`;
+    
+    res.json({
+      success: true,
+      shareToken: conversation.shareToken,
+      shareUrl,
+      message: 'Conversation is now public'
+    });
+  } catch (error) {
+    console.error('Share conversation error:', error);
+    res.status(500).json({ error: 'Failed to share conversation' });
+  }
+});
+
+// Revoke share (remove share token)
+router.delete('/:id/share', auth, async (req, res) => {
+  try {
+    const conversation = await Conversation.findOne({
+      _id: req.params.id,
+      userId: req.user.id
+    });
+
+    if (!conversation) {
+      return res.status(404).json({ error: 'Conversation not found' });
+    }
+
+    conversation.shareToken = null;
+    conversation.isPublic = false;
+    conversation.lastModified = new Date();
+
+    await conversation.save();
+    
+    res.json({
+      success: true,
+      message: 'Conversation is no longer public'
+    });
+  } catch (error) {
+    console.error('Revoke share error:', error);
+    res.status(500).json({ error: 'Failed to revoke share' });
   }
 });
 
