@@ -1,0 +1,172 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import 'reactflow/dist/style.css';
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-secondary-200 dark:border-secondary-700;
+  }
+  
+  body {
+    @apply bg-white dark:bg-secondary-900 text-secondary-900 dark:text-secondary-100;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+  
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-white dark:ring-offset-secondary-900;
+  }
+  
+  .btn-primary {
+    @apply bg-primary-600 text-white hover:bg-primary-700 active:bg-primary-800;
+  }
+  
+  .btn-secondary {
+    @apply bg-secondary-100 text-secondary-900 hover:bg-secondary-200 active:bg-secondary-300 dark:bg-secondary-800 dark:text-secondary-100 dark:hover:bg-secondary-700 dark:active:bg-secondary-600;
+  }
+  
+  .btn-ghost {
+    @apply hover:bg-secondary-100 hover:text-secondary-900 dark:hover:bg-secondary-800 dark:hover:text-secondary-100;
+  }
+  
+  .input {
+    @apply flex h-10 w-full rounded-md border border-secondary-200 bg-white px-3 py-2 text-sm ring-offset-white dark:ring-offset-secondary-900 file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-secondary-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:border-secondary-800 dark:bg-secondary-800 dark:placeholder:text-secondary-400 dark:focus-visible:ring-secondary-300;
+  }
+  
+  .card {
+    @apply rounded-lg border border-secondary-200 bg-white text-secondary-900 shadow-sm dark:border-secondary-800 dark:bg-secondary-900 dark:text-secondary-100;
+  }
+  
+  .card-header {
+    @apply flex flex-col space-y-1.5 p-6;
+  }
+  
+  .card-title {
+    @apply text-2xl font-semibold leading-none tracking-tight;
+  }
+  
+  .card-description {
+    @apply text-sm text-secondary-500 dark:text-secondary-400;
+  }
+  
+  .card-content {
+    @apply p-6 pt-0;
+  }
+  
+  .card-footer {
+    @apply flex items-center p-6 pt-0;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  
+  .gradient-text {
+    @apply bg-gradient-to-r from-primary-600 to-accent-600 bg-clip-text text-transparent;
+  }
+  
+  .glass {
+    @apply bg-white/80 backdrop-blur-sm border border-white/20;
+  }
+  
+  .glass-dark {
+    @apply bg-secondary-900/80 backdrop-blur-sm border border-secondary-700/20;
+  }
+}
+
+/* React Flow custom styles */
+.react-flow__node {
+  @apply transition-all duration-200;
+}
+
+/* Remove scale on hover to avoid transform jank during viewport transitions */
+.react-flow__node:hover {
+  @apply shadow-lg;
+}
+
+/* Beautiful n8n-style flow lines */
+.react-flow__edge {
+  opacity: 1;
+}
+
+.react-flow__edge-path {
+  stroke: #64748b !important;
+  stroke-width: 2px !important;
+  opacity: 0.8 !important;
+  transition: all 0.2s ease !important;
+  fill: none !important;
+}
+
+.react-flow__edge:hover .react-flow__edge-path {
+  stroke: #0ea5e9 !important;
+  stroke-width: 3px !important;
+  opacity: 1 !important;
+}
+
+/* Specific styling for smoothstep edges (n8n style) */
+.react-flow__edge-smoothstep .react-flow__edge-path {
+  stroke: #64748b !important;
+  stroke-width: 2px !important;
+  opacity: 0.8 !important;
+}
+
+.react-flow__edge-smoothstep:hover .react-flow__edge-path {
+  stroke: #0ea5e9 !important;
+  stroke-width: 3px !important;
+  opacity: 1 !important;
+}
+
+.react-flow__controls {
+  @apply bg-white dark:bg-secondary-900 border border-secondary-200 dark:border-secondary-700 rounded-lg shadow-lg;
+}
+
+.react-flow__controls-button {
+  @apply border-secondary-200 dark:border-secondary-700 bg-white dark:bg-secondary-800 text-secondary-700 dark:text-secondary-300 hover:bg-secondary-50 dark:hover:bg-secondary-700;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-secondary-100 dark:bg-secondary-800;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-secondary-300 dark:bg-secondary-600 rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-secondary-400 dark:bg-secondary-500;
+}
+
+/* Selection styles */
+::selection {
+  @apply bg-primary-200 dark:bg-primary-800 text-primary-900 dark:text-primary-100;
+}
+
+/* Focus styles */
+.focus-ring {
+  @apply focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-secondary-900;
+}

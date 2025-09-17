@@ -1,0 +1,57 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Environment files
+.env
+.env.local
+.env.*.local
+server/.env
+client/.env
+
+# Build outputs
+build/
+dist/
+client/build/
+client/dist/
+server/build/
+server/dist/
+.tmp/
+tmp/
+temp/
+
+# Coverage
+coverage/
+**/coverage/
+
+# Caches
+.cache/
+.parcel-cache/
+.next/
+out/
+.svelte-kit/
+.astro/
+*.tsbuildinfo
+
+# Editors/OS
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+
+# Misc
+*.pid
+*.seed
+*.tgz
+
+
