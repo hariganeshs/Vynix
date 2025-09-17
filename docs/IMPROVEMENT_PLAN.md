@@ -128,6 +128,56 @@ Last updated: 2025-09-17
 - Acceptance criteria:
   - Helpful instructions appear when LM Studio isn’t reachable
 
+### Phase 1B — Bring-Your-Own-Keys (BYOK) [Optional, Opt-in]
+
+Goal: Allow users to supply their own API keys for paid providers without changing the default zero-cost experience.
+
+1) Architecture & Modes
+- Ephemeral (no storage):
+  - Client includes `apiKeyOverride` per request to `/api/ai/generate`.
+  - Server uses the key only for that call; never persists it.
+- Encrypted storage (opt-in):
+  - Add `apiKeys` on `User` with per-provider encrypted secrets.
+  - Encryption: AES-256-GCM via Node `crypto`, using `KEY_ENCRYPTION_KEY` (KEK) from env.
+  - Stored shape per provider: `{ provider, ciphertext, iv, authTag, updatedAt, kekVersion }`.
+  - `.toJSON()` must never include keys; expose only boolean status via a summary route.
+
+2) Server Changes
+- `aiService`:
+  - Accept `apiKeyOverride` and `useUserKey` flags; selection priority: override > stored user key > process.env key.
+  - OpenAI-compatible: set `Authorization: Bearer <key>`.
+  - Google AI: append `?key=<key>` to URL (not header).
+  - Ensure logs mask headers/URLs; never log keys.
+- Routes (extend `auth.js` or add `keys.js`):
+  - `GET /api/auth/api-keys/summary` → returns configured status per provider (booleans only).
+  - `PATCH /api/auth/api-keys` → upsert/delete encrypted keys; body: `{ openai?, google?, groq?, openrouter? }` where string sets, `null` deletes.
+  - `DELETE /api/auth/api-keys/:provider` → delete that key.
+  - `POST /api/ai/test-connection` → accept `apiKeyOverride` to validate a provided key.
+- Free-mode guard:
+  - `ALLOW_BYOK_IN_FREE_MODE` (default `false`). If `FREE_MODE=true` and not allowed, ignore BYOK inputs and stored keys.
+
+3) Client Changes
+- Settings UI (new page/section):
+  - Masked inputs per provider with Save and Test buttons.
+  - Fetch status from `/api/auth/api-keys/summary` (no secrets returned).
+- Conversation settings:
+  - Toggle "Use my key" for this conversation; persist flag in conversation `settings`.
+  - Advanced: one-off `apiKeyOverride` for a single call.
+- Error UX:
+  - Clear messages when a chosen provider requires a key but none is available.
+
+4) Security & Privacy
+- Keys never returned once stored; only the user submits them.
+- Exclude keys from logs and sanitized errors.
+- Rate-limit key routes; require JWT; optional re-auth for updates.
+- Lightweight audit log for key set/clear events (no key material stored).
+
+5) Acceptance Criteria
+- With `FREE_MODE=true` and `ALLOW_BYOK_IN_FREE_MODE=false`, BYOK is unavailable even if keys exist.
+- With `ALLOW_BYOK_IN_FREE_MODE=true`, BYOK works only when user explicitly enables it.
+- Ephemeral override works without persisting; stored keys are encrypted and usable.
+- Summary endpoint accurately reflects which providers are configured.
+
 ### Phase 2 — Performance, Streaming, and Growth
 
 8) Streaming Responses (SSE)
@@ -270,6 +320,8 @@ FREE_MODE=true
 CACHE_DISABLED=false
 CACHE_MAX_ITEMS=500
 CACHE_TTL_MS=86400000
+ALLOW_BYOK_IN_FREE_MODE=false
+KEY_ENCRYPTION_KEY=change_me_strong_random_32_bytes
 
 # Client
 REACT_APP_FREE_MODE=true
